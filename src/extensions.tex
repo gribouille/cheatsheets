@@ -1,0 +1,318 @@
+\input ./template.tex
+
+\starttext
+\startcolumns[n=2]
+
+% ------------------------------------------------------------------------------
+%                                   SYNTAX
+% ------------------------------------------------------------------------------
+
+\section{Syntax}
+
+% --- LambdaCase ---------------------------------------------------------------
+\subsection{LambdaCase}
+
+The LambdaCase extension enables expressions of the form
+
+\startHS
+\case { p1 -> e1; ...; pN -> eN }
+\stopHS
+
+which is equivalent to
+\startHS
+\freshName -> case freshName of { p1 -> e1; ...; pN -> eN }
+\stopHS
+
+Note that \type{\case} starts a layout, so you can write
+\startHS
+\case
+  p1 -> e1
+  ...
+  pN -> eN
+\stopHS
+
+Exemple:
+\startHS
+data Status = Success | Failed | StandBy
+
+showStatus1 :: Status -> String
+showStatus1 x = case x of
+    Success -> "ok"
+    Failed  -> "not ok"
+    StandBy -> "retry"
+\stopHS
+
+\startHS
+{-# LANGUAGE LambdaCase #-}
+
+showStatus :: Status -> String
+showStatus = \case
+    Success -> "ok"
+    Failed  -> "not ok"
+    StandBy -> "retry"
+
+map showStatus [Success, Failed, StandBy] -- ["ok","not ok","retry"]
+\stopHS
+
+
+
+% --- ViewPatterns -------------------------------------------------------------
+\subsection{ViewPatterns}
+
+Etend le mattern matching au résultat de fonction.
+
+​\startHS
+data Color = Blue | Green | Red
+
+toRGB :: Color -> (Int, Int, Int)
+toRGB Red = (255, 0, 0)
+toRGB Green = (0, 255, 0)
+toRGB Blue = (0, 0, 255)
+
+first :: (a, b, c) -> a
+first (x, _, _) = x
+
+f1 :: Color -> String
+f1 c
+    | (first . toRGB) c == 0 = "ok"
+    | otherwise = "nok"
+
+f1 Blue -- -> "ok"
+\stopHS
+
+
+% ------------------------------------------------------------------------------
+%                                   RECORDS
+% ------------------------------------------------------------------------------
+
+\section{Records}
+
+% --- DuplicateRecordFields ----------------------------------------------------
+\subsection{DuplicateRecordFields}
+
+\startHS
+{-# LANGUAGE DuplicateRecordFields #-}
+
+data Foo = Foo { uid :: Int }
+data Bar = Bar { uid :: Int }
+\stopHS
+
+Cette extension a une limitation:
+\startHS
+l = [Foo 1, Foo 2, Foo 3]
+map (\x -> uid (x :: Foo)) l
+map (uid :: Foo -> Int) l
+\stopHS
+
+Limitation, pourtant le type est évident:
+\startHS
+map (\(x :: Foo) -> uid x) l  -- -> [1,2,3]
+\stopHS
+
+
+
+% ------------------------------------------------------------------------------
+%                                      KINDS
+% ------------------------------------------------------------------------------
+
+\section{Kinds}
+
+Le kind est le type du constructeur de type.
+
+En anglais: {\it type ∼ particular kind}. On pourrait traduire {\it kind} par
+{\it catégorie}.
+
+Exemple ({\tt :k}):
+\startHS
+Int :: *
+Maybe :: * -> *
+Either :: * -> * -> *
+[] :: * -> *
+(->) :: * -> * -> *
+\stopHS
+
+{\tt Maybe} dépend d'un type (son constructeur de type prend 1 type),
+{\tt Either} de deux, etc.
+
+Par défaut, tout type concret est représenté par {\tt *}.
+
+
+% --- DataKinds ----------------------------------------------------------------
+\subsection{DataKinds}
+
+Ce que l'on veut c'est pouvoir créer nos propres {\it kind}. Si on écrit:
+\startHS
+data Nat = S Nat | Z
+\stopHS
+
+{\tt Nat} est un type, {\tt S} et {\tt Z} sont des constructeurs de type mais
+non des types (ce sont des fonctions).
+
+Avec DataKinks, S et Z deviennent des types:
+\startHS
+λ> :set -XDataKinds
+λ> data Nat = S Nat | Z
+λ> :k Nat
+Nat :: *
+λ> :k S
+S :: Nat -> Nat
+λ> :k Z
+Z :: Nat
+\stopHS
+
+
+% --- KindSignatures -----------------------------------------------------------
+% \subsection{KindSignatures}
+%
+% \startHS
+% :k Maybe Int
+% :k Either Int
+%
+% Maybe Int :: *
+% Either Int :: * -> *
+%
+% :k (Maybe Maybe)
+% \stopHS
+%
+% \starttyping
+% <interactive>:1:8: error:
+%     • Expecting one more argument to ‘Maybe’
+%       Expected a type, but ‘Maybe’ has kind ‘* -> *’
+%     • In the first argument of ‘Maybe’, namely ‘Maybe’
+%       In the type ‘(Maybe Maybe)’
+% \stoptyping
+%
+% Pourquoi on a pas {\tt Maybe Maybe :: (* ->  *) -> * ???}
+%
+% {\tt Maybe Maybe} n'est pas un type valide car {\tt Maybe} est de kind
+% {\tt * -> *} donc son paramètre doit être de kind {\tt *} or on lui passe un
+% paramètre {\tt Maybe} de kind {\tt * -> *}.
+%
+% \startHS
+% :k Maybe (Maybe Int)
+% Maybe (Maybe Int) :: *
+%
+% newtype MMaybe a = Maybe (Maybe a)
+%
+% :k MMaybe
+%
+% MMaybe :: * -> *
+%
+% data EEither a b c = Either (Either a b) c
+%
+% :k EEither
+%
+% EEither :: * -> * -> * -> *
+% \stopHS
+%
+% Creusons:
+% \startHS
+% data Computable a f = Computation (f a) a
+% :k Computable
+%
+% Computable :: * -> (* -> *) -> *
+%
+% f prend forcément un paramètre donc est de kind * -> *.
+%
+% \startHS
+% :k Computable String
+% :k Computable Int Maybe
+% :k Computable (Maybe String) ((->) Int)
+%
+% Computable String :: (* -> *) -> *
+% Computable Int Maybe :: *
+% Computable (Maybe String) ((->) Int) :: *
+%
+% On peut spécialiser ensuite notre type:
+%
+% \startHS
+% type IntComputation f = Computable Int f
+%
+% :k IntComputation
+%
+% IntComputation :: (* -> *) -> *
+% KindSignatures
+%
+% De la même façon que GHC infère automatiquement le quantifier de type (forall), GHC infère le kind et comme pour forall, il peut être intéressant de ne pas avoir l'inférence par défaut. Par exemple:
+%
+% \startHS
+% newtype T f a = MkT (f a)
+% :k T
+%
+% T :: (* -> *) -> * -> *
+%
+% Haskell a determiné que le kind de f :: * -> * et a :: * mais ce n'est pas obligatoire, ça pourait être par exemple:
+%
+%     f :: (* -> *) -> * et a :: * -> *
+%     ou f :: (* -> * -> *) -> * et a :: * -> * -> *
+%     etc.
+%
+% newtype Set ctx a = Set [a]
+% :k Set
+%
+% Set :: * -> * -> *
+%
+% Sans plus de précision, Haskell infère le kind de ctx :: * mais imaginons que l'on veuille ctx :: * -> *, alors on doit spécifier un constructeur fake pour cela:
+%
+% data Set ctx a = Set [a] | Unused (ctx a -> ())
+% :k Set
+%
+% Set :: (* -> *) -> * -> *
+%
+% L'extension permet de préciser tout ça:
+%
+% {-# LANGUAGE KindSignatures #-}
+%
+% newtype Set (ctx :: * -> *) a = Set [a]
+% :k Set
+%
+% Set :: (* -> *) -> * -> *
+%
+% Cela peut prendre la place suivant le contexte:
+%
+% data Set (cxt :: Type -> Type) a = Set [a]
+%
+% type T (f :: Type -> Type) = f Int
+%
+% class (Eq a) => C (f :: Type -> Type) a where ...
+%
+% f :: forall (cxt :: Type -> Type). Set cxt Int
+%
+% PolyKinds
+%
+% {-# LANGUAGE PolyKinds #-}
+%
+% newtype T (f :: k -> *) (a :: k) = MkT (f a)
+% :k Set
+%
+% Set :: (* -> *) -> * -> *
+%
+% :k Num
+%
+% Num :: * -> Constraint
+
+
+
+
+% DuplicateRecordFields
+% OverloadedRecordFields
+% RecordWildCards
+%
+% InstanceSigs
+%
+% GeneralizedNewtypeDeriving
+%
+% ExplicitForAll
+% ExistentialQuantification
+% Rank2Types
+% RankNTypes
+% ScopedTypeVariables
+% TypeApplications
+% AllowAmbiguosTypes.
+
+
+
+
+\stopcolumns
+
+\stoptext

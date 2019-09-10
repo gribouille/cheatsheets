@@ -1,0 +1,36 @@
+\usemodule[vim]
+
+\mainlanguage[en]
+\setcharacterspacing[frenchpunctuation]
+\setuplayout[
+  margin=0mm,
+  footer=0mm,
+  width=288mm,
+  height=202mm,
+  backspace=4mm,
+  topspace=4mm,
+  top=0mm,
+  topdistance=0mm,
+  header=0mm,
+  headerdistance=0mm,
+  bottom=0mm
+]
+\setupcolors[state=start]
+\usecolors[xwi]
+\setuppapersize[A4,landscape]
+\setupbodyfont[DejaVu,sansserif,10pt]
+
+% Disable auto page numbering
+\setuppagenumbering[location=]
+\definevimtyping[HS][syntax=haskell]
+\setuphead[section][textstyle=\tf,after={\blank[2mm]},before={\blank[3mm]}]
+
+\define[1]\legend{
+  \framed[
+    corner=06,
+    roffset=2mm,
+    frame=off,
+    background=color,
+    backgroundcolor=aliceblue,
+    align=flushright,
+    width=\textwidth]{\tfxx\inlineHS{#1}}}
